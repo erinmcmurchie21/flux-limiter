@@ -32,10 +32,26 @@ class Grid(object):
         self.ihi = nGhost+nx-1
 
         # physical coords -- cell-centered, left and right edges
-        self.dx = (xmax - xmin)/(nx)
-        self.xCentres = xmin + (np.arange(nx+2*nGhost)-nGhost+0.5)*self.dx
-        self.xL = xmin + (np.arange(nx+2*nGhost)-nGhost)*self.dx
-        self.xR = xmin + (np.arange(nx+2*nGhost)+1.0)*self.dx
+        self.dx_wide = 2* (xmax - xmin) / (2*nx - 9)
+        self.dx_small = self.dx_wide / 4
+        xGhost_start = xmin - self.dx_small * (np.arange(nGhost)+0.5)
+        xFirst = xmin + (np.arange(3)+0.5)*self.dx_small
+        xCentral = xmin + xFirst[-1] + (np.arange(nx-6)+1/8+1/2)*self.dx_wide
+        xEnd = xmin + xCentral[-1] + (1/8+1/2)*self.dx_wide + self.dx_small*(np.arange(3))
+        xGhost_end = xmax + self.dx_small * (np.arange(nGhost)+0.5)
+        self.xCentres = np.concatenate((xGhost_start, xFirst, xCentral, xEnd, xGhost_end))
+        
+        for n in range(1, nGhost +4):
+            xWalls = self.xCentres[:n] - 0.5*self.dx_small
+        for n in range(nGhost + 4, nx-3+nGhost):
+            xWalls = self.xCentres[:n] - 0.5*self.dx_wide
+        for n in range (nx-3, nx+2*nGhost+2):
+            xWalls = self.xCentres[:n] - 0.5*self.dx_small
+
+        xWalls = np.append(xWalls, self.xCentres[nx+2*nGhost-1] + 0.5*self.dx_small)
+        
+        self.xL = xWalls[1:nx+2*nGhost]
+        self.xR = xWalls[2:nx+2*nGhost+1]
 
         # storage for the solution
         self.phi = np.zeros(nx+2*nGhost)
@@ -62,7 +78,6 @@ class Grid(object):
         print("xL:", self.xL)
         print("xR:", self.xR)
         print("xCentres:", self.xCentres)
-        print("dx:", self.dx)
         print("ilo:", self.ilo)
         print("ihi:", self.ihi)
         print("starting phi values", self.phi)
@@ -116,7 +131,7 @@ class Simulation(object):
         if self.slope_type == "centered":
 
             for i in range(g.ilo-1, g.ihi+2):
-                slope[i] = 0.5*(g.phi[i+1] - g.phi[i-1])/g.dx
+                slope[i] = 0.5*(g.phi[i+1] - g.phi[i-1])/(g.xCentres[i+1]-g.xCentres[i-1])
 
         elif self.slope_type == "vanleer":
             for i in range(g.ilo-1, g.ihi+2):
@@ -124,7 +139,7 @@ class Simulation(object):
                 # returns the " limited slowp = van leer function * slope"
                 epsilon = 1.0e-10
                 r = ((g.phi[i+1] - g.phi[i])+ epsilon)/((g.phi[i]-g.phi[i-1])+ epsilon)
-                slope [i] = (r + abs(r))/(1.0 + abs(r)) * (g.phi[i]-g.phi[i-1])/g.dx
+                slope [i] = (r + abs(r))/(1.0 + abs(r)) * (g.phi[i]-g.phi[i-1])/(g.xCentres[i]-g.xCentres[i-1])
 
 
         # loop over all the interfaces.  Here, i refers to the left
