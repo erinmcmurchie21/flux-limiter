@@ -1,7 +1,7 @@
 import numpy as np
 
 nx = 10
-nGhost = 2
+nGhost = 1
 xmin = 0
 xmax = 1.0
 
